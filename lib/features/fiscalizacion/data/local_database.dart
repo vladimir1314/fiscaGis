@@ -1,0 +1,225 @@
+import 'package:fiscagis/features/fiscalizacion/data/fiscalizacion_models.dart';
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:flutter/foundation.dart'; // For kIsWeb
+
+class LocalDatabase {
+  static final LocalDatabase instance = LocalDatabase._init();
+  static Database? _database;
+
+  LocalDatabase._init();
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDB('fiscagis.db');
+    return _database!;
+  }
+
+  Future<Database> _initDB(String filePath) async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, filePath);
+
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: _createDB,
+    );
+  }
+
+  Future<void> _createDB(Database db, int version) async {
+    // Table PREDIO
+    await db.execute('''
+      CREATE TABLE predio (
+        id_predio TEXT PRIMARY KEY,
+        id_propietario TEXT,
+        nombre_propietario TEXT,
+        direccion TEXT,
+        numero TEXT,
+        condicion TEXT,
+        barrio TEXT,
+        manzana TEXT,
+        lote TEXT,
+        estado TEXT,
+        tipo TEXT,
+        uso TEXT,
+        clasificacion TEXT,
+        x REAL,
+        y REAL,
+        c_firma TEXT,
+        is_synced INTEGER DEFAULT 0
+      )
+    ''');
+
+    // Table CONSTRUCCION
+    await db.execute('''
+      CREATE TABLE construccion (
+        id TEXT PRIMARY KEY,
+        id_predio TEXT,
+        piso TEXT,
+        seccion TEXT,
+        fecha_construccion TEXT,
+        material TEXT,
+        estado TEXT,
+        area_construccion REAL,
+        area_inspeccionada REAL,
+        mc TEXT, t TEXT, p TEXT, pv TEXT, r TEXT, b TEXT, ie TEXT,
+        is_synced INTEGER DEFAULT 0,
+        FOREIGN KEY (id_predio) REFERENCES predio (id_predio)
+      )
+    ''');
+    
+    // Table FOTO
+    await db.execute('''
+      CREATE TABLE foto (
+        id_captura TEXT PRIMARY KEY,
+        id_predio TEXT,
+        descripcion TEXT,
+        c_ruta TEXT,
+        is_synced INTEGER DEFAULT 0,
+        FOREIGN KEY (id_predio) REFERENCES predio (id_predio)
+      )
+    ''');
+  }
+
+  // --- CRUD PREDIO ---
+  Future<void> insertOrUpdatePredio(PredioModel item) async {
+    final db = await database;
+    final data = {
+      'id_predio': item.idPredio,
+      'id_propietario': item.idPropietario,
+      'nombre_propietario': item.nombrePropietario,
+      'direccion': item.direccion,
+      'numero': item.numero,
+      'condicion': item.condicion,
+      'barrio': item.barrio,
+      'manzana': item.manzana,
+      'lote': item.lote,
+      'estado': item.estado,
+      'tipo': item.tipo,
+      'uso': item.uso,
+      'clasificacion': item.clasificacion,
+      'x': item.x,
+      'y': item.y,
+      'c_firma': item.cFirma,
+      'is_synced': 0, // Always mark unsynced on update
+    };
+    
+    // Check if exists
+    final exists = await db.query('predio', where: 'id_predio = ?', whereArgs: [item.idPredio]);
+    if (exists.isNotEmpty) {
+      await db.update('predio', data, where: 'id_predio = ?', whereArgs: [item.idPredio]);
+    } else {
+      await db.insert('predio', data);
+    }
+  }
+
+  Future<PredioModel?> getPredio(String id) async {
+    final db = await database;
+    final maps = await db.query('predio', where: 'id_predio = ?', whereArgs: [id]);
+
+    if (maps.isNotEmpty) {
+      final map = maps.first;
+      return PredioModel(
+        idPredio: map['id_predio'] as String?,
+        idPropietario: map['id_propietario'] as String?,
+        nombrePropietario: map['nombre_propietario'] as String?,
+        direccion: map['direccion'] as String?,
+        numero: map['numero'] as String?,
+        condicion: map['condicion'] as String?,
+        barrio: map['barrio'] as String?,
+        manzana: map['manzana'] as String?,
+        lote: map['lote'] as String?,
+        estado: map['estado'] as String?,
+        tipo: map['tipo'] as String?,
+        uso: map['uso'] as String?,
+        clasificacion: map['clasificacion'] as String?,
+        x: map['x'] as double?,
+        y: map['y'] as double?,
+        cFirma: map['c_firma'] as String?,
+      );
+    }
+    return null;
+  }
+
+  // --- CRUD CONSTRUCCION ---
+  Future<void> insertConstruccion(ConstruccionModel item) async {
+    final db = await database;
+    await db.insert('construccion', {
+      'id': item.id,
+      'id_predio': item.idPredio,
+      'piso': item.piso,
+      'seccion': item.seccion,
+      'fecha_construccion': item.fechaConstruccion.toIso8601String(),
+      'material': item.material,
+      'estado': item.estado,
+      'area_construccion': item.areaConstruccion,
+      'area_inspeccionada': item.areaInspeccionada,
+      'mc': item.mc, 't': item.t, 'p': item.p,
+      'pv': item.pv, 'r': item.r, 'b': item.b, 'ie': item.ie,
+      'is_synced': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<ConstruccionModel>> getConstrucciones(String predioId) async {
+    final db = await database;
+    final result = await db.query('construccion', where: 'id_predio = ?', whereArgs: [predioId]);
+    
+    return result.map((json) => ConstruccionModel(
+      id: json['id'] as String,
+      idPredio: json['id_predio'] as String,
+      piso: json['piso'] as String,
+      seccion: json['seccion'] as String,
+      fechaConstruccion: DateTime.parse(json['fecha_construccion'] as String),
+      material: json['material'] as String,
+      estado: json['estado'] as String,
+      areaConstruccion: json['area_construccion'] as double,
+      areaInspeccionada: json['area_inspeccionada'] as double,
+      mc: json['mc'] as String?, t: json['t'] as String?, p: json['p'] as String?,
+      pv: json['pv'] as String?, r: json['r'] as String?, b: json['b'] as String?, ie: json['ie'] as String?,
+    )).toList();
+  }
+
+  Future<void> deleteConstruccion(String id) async {
+    final db = await database;
+    await db.delete('construccion', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- CRUD FOTO ---
+  Future<void> insertOrUpdateFoto(FotoModel item) async {
+    if (item.idCaptura == null) return;
+    final db = await database;
+    final data = {
+      'id_captura': item.idCaptura,
+      'id_predio': item.idPredio,
+      'descripcion': item.descripcion,
+      'c_ruta': item.cRuta,
+      'is_synced': 0,
+    };
+     await db.insert('foto', data, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+  
+  Future<FotoModel?> getFoto(String predioId) async {
+    final db = await database;
+    final result = await db.query('foto', where: 'id_predio = ?', whereArgs: [predioId], limit: 1);
+    if (result.isNotEmpty) {
+      final json = result.first;
+      return FotoModel(
+        idCaptura: json['id_captura'] as String?,
+        idPredio: json['id_predio'] as String?,
+        descripcion: json['descripcion'] as String?,
+        cRuta: json['c_ruta'] as String?,
+      );
+    }
+    return null;
+  }
+
+  // --- SYNC HELPERS ---
+  Future<List<Map<String, dynamic>>> getUnsyncedPredios() async => await (await database).query('predio', where: 'is_synced = 0');
+  Future<List<Map<String, dynamic>>> getUnsyncedConstrucciones() async => await (await database).query('construccion', where: 'is_synced = 0');
+  Future<List<Map<String, dynamic>>> getUnsyncedFotos() async => await (await database).query('foto', where: 'is_synced = 0');
+  
+  Future<void> markSynced(String table, String idCol, String id) async {
+    final db = await database;
+    await db.update(table, {'is_synced': 1}, where: '$idCol = ?', whereArgs: [id]);
+  }
+}

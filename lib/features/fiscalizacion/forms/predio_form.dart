@@ -144,11 +144,11 @@ class _PredioFormState extends State<PredioForm> {
   Widget _buildReadOnlyField(String label, TextEditingController ctrl) {
     return TextField(
       controller: ctrl,
-      readOnly: true,
+      // readOnly: true, // User requested editable
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: AppColors.primary),
-        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.green)),
+        labelStyle: const TextStyle(color: AppColors.primary),
+        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.green)),
       ),
     );
   }

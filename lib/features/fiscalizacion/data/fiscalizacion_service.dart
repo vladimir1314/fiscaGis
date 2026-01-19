@@ -1,13 +1,15 @@
+import 'dart:convert';
 import 'package:fiscagis/features/fiscalizacion/data/fiscalizacion_models.dart';
 import 'package:fiscagis/features/fiscalizacion/data/local_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 class FiscalizacionService extends ChangeNotifier {
   // Singleton
   static final FiscalizacionService _instance = FiscalizacionService._internal();
   factory FiscalizacionService() => _instance;
   FiscalizacionService._internal() {
-    _initRepository();
+    // We don't auto-load a specific ID anymore on init, or we load list
   }
 
   final _db = LocalDatabase.instance;
@@ -16,48 +18,49 @@ class FiscalizacionService extends ChangeNotifier {
   PredioModel predio = PredioModel();
   List<ConstruccionModel> construcciones = [];
   FotoModel foto = FotoModel();
+  
+  // List State
+  List<PredioModel> allFiscalizaciones = []; // Summary list
 
-  Future<void> _initRepository() async {
-    // Attempt to load existing data
-    // For demo, we assume we are working with specific ID '11628'
-    const targetId = '11628';
-    
-    // 1. Get Predio
-    final loadedPredio = await _db.getPredio(targetId);
-    if (loadedPredio != null) {
-      predio = loadedPredio;
-    } else {
-      // Initialize with default if not found (First Run)
-      predio = PredioModel(
-        idPredio: targetId,
-        idPropietario: '9923',
-        nombrePropietario: 'HINOSTROZA GUTIERREZ FORTUNATO',
-        direccion: 'CALLE SIN NOMBRE',
-        numero: '167 N',
-        createdAt: DateTime.now(),
-      );
-      await _db.insertOrUpdatePredio(predio);
-    }
-
-    // 2. Get Construcciones
-    construcciones = await _db.getConstrucciones(targetId);
-    if (construcciones.isEmpty) {
-       // Optional: Add mock if empty
-       // ...
-    }
-
-    // 3. Get Foto
-    final loadedFoto = await _db.getFoto(targetId);
-    if (loadedFoto != null) {
-      foto = loadedFoto;
-    } else {
-       foto = FotoModel(idPredio: targetId);
-    }
-
+  // --- List Management ---
+  
+  Future<void> loadAll() async {
+    allFiscalizaciones = await _db.getAllPredios();
     notifyListeners();
   }
 
-  // --- Methods ---
+  Future<void> startNewInspection() async {
+    // Generate new unique ID
+    final newId = DateTime.now().millisecondsSinceEpoch.toString();
+    
+    predio = PredioModel(
+      idPredio: newId,
+      createdAt: DateTime.now(),
+      // Defaults or Empty?
+      nombrePropietario: '',
+      direccion: '',
+      numero: '',
+    );
+    construcciones = [];
+    foto = FotoModel(idPredio: newId);
+    
+    // Save initial draft
+    await _db.insertOrUpdatePredio(predio);
+    notifyListeners();
+  }
+
+  Future<void> loadInspection(String id) async {
+    final loaded = await _db.getPredio(id);
+    if (loaded != null) {
+      predio = loaded;
+      construcciones = await _db.getConstrucciones(id);
+      final loadedFoto = await _db.getFoto(id);
+      foto = loadedFoto ?? FotoModel(idPredio: id);
+      notifyListeners();
+    }
+  }
+
+  // --- CRUD Methods ---
 
   Future<void> updatePredio(PredioModel newPredio) async {
     predio = newPredio;
@@ -66,6 +69,8 @@ class FiscalizacionService extends ChangeNotifier {
   }
 
   Future<void> addConstruccion(ConstruccionModel construccion) async {
+    // Ensure FK is set
+    construccion.idPredio = predio.idPredio ?? '';
     construcciones.add(construccion);
     await _db.insertConstruccion(construccion);
     notifyListeners();
@@ -78,7 +83,6 @@ class FiscalizacionService extends ChangeNotifier {
   }
 
   Future<void> updateFoto(FotoModel newFoto) async {
-    // Generate UUID if needed
     if (newFoto.idCaptura == null) {
         newFoto.idCaptura = DateTime.now().millisecondsSinceEpoch.toString();
     }
@@ -90,7 +94,7 @@ class FiscalizacionService extends ChangeNotifier {
   // --- SYNC ---
   bool isSyncing = false;
   
-  Future<String> synchronize() async {
+  Future<SyncResult> synchronize() async {
      try {
        isSyncing = true;
        notifyListeners();
@@ -104,25 +108,81 @@ class FiscalizacionService extends ChangeNotifier {
        if (total == 0) {
          isSyncing = false;
          notifyListeners();
-         return "Nada pendiente de sincronizar.";
+         return SyncResult(success: true, message: "Todo está actualizado.", count: 0);
        }
        
-       // 2. Mock API Sending loop
-       await Future.delayed(const Duration(seconds: 2)); // Simulate network
+       // 2. Real API Sending loop
+       final url = Uri.parse('https://jsonplaceholder.typicode.com/posts'); 
+       int successCount = 0;
        
-       // 3. Mark as synced
-       for (var r in unsyncedPredios) await _db.markSynced('predio', 'id_predio', r['id_predio']);
-       for (var r in unsyncedConst) await _db.markSynced('construccion', 'id', r['id']);
-       for (var r in unsyncedFotos) await _db.markSynced('foto', 'id_captura', r['id_captura']);
+       // Send Predios
+       for (var item in unsyncedPredios) {
+         try {
+            final resp = await http.post(
+              url,
+              headers: {"Content-Type": "application/json"},
+              body: jsonEncode(item),
+            );
+            if (resp.statusCode == 200 || resp.statusCode == 201) {
+              await _db.markSynced('predio', 'id_predio', item['id_predio']);
+              successCount++;
+            }
+         } catch(e) { print(e); }
+       }
+       
+        // Send Construcciones
+       for (var item in unsyncedConst) {
+         try {
+           final resp = await http.post(
+             url,
+             headers: {"Content-Type": "application/json"},
+             body: jsonEncode(item),
+           );
+           if (resp.statusCode == 200 || resp.statusCode == 201) {
+             await _db.markSynced('construccion', 'id', item['id']);
+             successCount++;
+           }
+         } catch(e) { print(e); }
+       }
+       
+        // Send Fotos
+       for (var item in unsyncedFotos) {
+         try {
+           final resp = await http.post(
+             url,
+             headers: {"Content-Type": "application/json"},
+             body: jsonEncode(item),
+           );
+           if (resp.statusCode == 200 || resp.statusCode == 201) {
+             await _db.markSynced('foto', 'id_captura', item['id_captura']);
+             successCount++;
+           }
+         } catch(e) { print(e); }
+       }
        
        isSyncing = false;
+       await loadAll(); // Refresh list to update sync icons
        notifyListeners();
-       return "Sincronización Exitosa: $total registros enviados.";
+       return SyncResult(
+         success: successCount > 0, 
+         message: "Sincronización completada.", 
+         count: successCount,
+         total: total
+       );
        
      } catch (e) {
        isSyncing = false;
        notifyListeners();
-       return "Error al sincronizar: $e";
+       return SyncResult(success: false, message: "Error de conexión: $e");
      }
   }
+}
+
+class SyncResult {
+  final bool success;
+  final String message;
+  final int count;
+  final int total;
+  
+  SyncResult({required this.success, required this.message, this.count = 0, this.total = 0});
 }

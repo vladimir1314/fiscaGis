@@ -1,5 +1,6 @@
 import 'package:fiscagis/core/theme/app_colors.dart';
 import 'package:fiscagis/features/fiscalizacion/fiscalizacion_screen.dart';
+import 'package:fiscagis/features/fiscalizacion/fiscalizaciones_list_screen.dart'; // Fixed import
 import 'package:flutter/material.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -113,9 +114,10 @@ class DashboardScreen extends StatelessWidget {
   }
 
   void _navigateToFiscalizacion(BuildContext context, int initialIndex) {
+    // Now we redirect to List Screen effectively acting as the main entry
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => FiscalizacionScreen(initialIndex: initialIndex),
+        builder: (context) => const FiscalizacionesListScreen(),
       ),
     );
   }

@@ -1,6 +1,6 @@
 import 'package:fiscagis/core/theme/app_colors.dart';
 import 'package:fiscagis/features/auth/login_controller.dart';
-import 'package:fiscagis/main.dart'; // Importar main para navegar a MyHomePage
+import 'package:fiscagis/features/dashboard/dashboard_screen.dart';
 import 'package:flutter/material.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -26,10 +26,15 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        final success = await _loginController.login(
-          _usernameController.text,
-          _passwordController.text,
-        );
+        // final success = await _loginController.login(
+        //   _usernameController.text,
+        //   _passwordController.text,
+        // );
+
+        // TODO: Eliminar esta simulación cuando el backend esté listo
+        await Future.delayed(const Duration(seconds: 1));
+        final success = _usernameController.text == 'admin' && 
+                       _passwordController.text == 'admin';
 
         if (mounted) {
           setState(() {
@@ -39,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
           if (success) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (context) => const MyHomePage(title: 'Fisca GIS'),
+                builder: (context) => const DashboardScreen(),
               ),
             );
           } else {

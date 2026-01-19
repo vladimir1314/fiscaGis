@@ -46,6 +46,7 @@ class LocalDatabase {
         x REAL,
         y REAL,
         c_firma TEXT,
+        created_at TEXT,
         is_synced INTEGER DEFAULT 0
       )
     ''');
@@ -101,6 +102,7 @@ class LocalDatabase {
       'x': item.x,
       'y': item.y,
       'c_firma': item.cFirma,
+      'created_at': item.createdAt?.toIso8601String(),
       'is_synced': 0, // Always mark unsynced on update
     };
     
@@ -139,6 +141,31 @@ class LocalDatabase {
       );
     }
     return null;
+  }
+
+  Future<List<PredioModel>> getAllPredios() async {
+    final db = await database;
+    final result = await db.query('predio', orderBy: 'created_at DESC');
+    return result.map((map) => PredioModel(
+      idPredio: map['id_predio'] as String?,
+      idPropietario: map['id_propietario'] as String?,
+      nombrePropietario: map['nombre_propietario'] as String?,
+      direccion: map['direccion'] as String?,
+      numero: map['numero'] as String?,
+      condicion: map['condicion'] as String?,
+      barrio: map['barrio'] as String?,
+      manzana: map['manzana'] as String?,
+      lote: map['lote'] as String?,
+      estado: map['estado'] as String?,
+      tipo: map['tipo'] as String?,
+      uso: map['uso'] as String?,
+      clasificacion: map['clasificacion'] as String?,
+      x: map['x'] as double?,
+      y: map['y'] as double?,
+      cFirma: map['c_firma'] as String?,
+      isSynced: (map['is_synced'] as int? ?? 0) == 1,
+      // createdAt is missing in DB schema but useful for sorting
+    )).toList();
   }
 
   // --- CRUD CONSTRUCCION ---

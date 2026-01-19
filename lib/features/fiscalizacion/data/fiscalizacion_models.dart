@@ -16,6 +16,7 @@ class PredioModel {
   double? y;
   String? cFirma;
   DateTime? createdAt;
+  bool isSynced; 
 
   PredioModel({
     this.idPredio,
@@ -35,6 +36,7 @@ class PredioModel {
     this.y,
     this.cFirma,
     this.createdAt,
+    this.isSynced = false,
   });
 }
 

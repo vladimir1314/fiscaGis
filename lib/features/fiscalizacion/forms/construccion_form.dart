@@ -99,12 +99,13 @@ class _ConstruccionFormState extends State<ConstruccionForm> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _MatrixCell('MC', true),
-                        _MatrixCell('T', false),
-                        _MatrixCell('P', true),
-                         _MatrixCell('PV', false),
-                          _MatrixCell('R', true),
-                           _MatrixCell('B', true),
+                        _MatrixCell('MC', _hasVal(item.mc), value: item.mc),
+                        _MatrixCell('T', _hasVal(item.t), value: item.t),
+                        _MatrixCell('P', _hasVal(item.p), value: item.p),
+                         _MatrixCell('PV', _hasVal(item.pv), value: item.pv),
+                          _MatrixCell('R', _hasVal(item.r), value: item.r),
+                           _MatrixCell('B', _hasVal(item.b), value: item.b),
+                           _MatrixCell('IE', _hasVal(item.ie), value: item.ie),
                       ],
                     ),
                   ),
@@ -118,20 +119,34 @@ class _ConstruccionFormState extends State<ConstruccionForm> {
       ),
     );
   }
+
+  bool _hasVal(String? v) => v != null && v.isNotEmpty && v != 'null';
 }
 
 class _MatrixCell extends StatelessWidget {
   final String label;
+  final String? value;
   final bool active;
-  const _MatrixCell(this.label, this.active);
+  
+  const _MatrixCell(this.label, this.active, {this.value});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 2),
-      padding: const EdgeInsets.all(8),
-      color: active ? AppColors.primary : Colors.grey[300],
-      child: Text(label, style: TextStyle(color: active ? Colors.white : Colors.black)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: active ? AppColors.primary : Colors.grey[200],
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: active ? AppColors.primary : Colors.grey),
+      ),
+      child: Column(
+        children: [
+           Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: active ? Colors.white : Colors.black54)),
+           if (active && value != null)
+             Text(value!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
+        ],
+      ),
     );
   }
 }

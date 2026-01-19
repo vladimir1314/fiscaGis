@@ -1,4 +1,5 @@
 import 'package:fiscagis/core/theme/app_colors.dart';
+import 'package:fiscagis/features/auth/login_controller.dart';
 import 'package:fiscagis/main.dart'; // Importar main para navegar a MyHomePage
 import 'package:flutter/material.dart';
 
@@ -10,28 +11,32 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final LoginController _loginController = LoginController();
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isPasswordVisible = false;
 
-  void _login() {
+  Future<void> _login() async {
+    debugPrint('Login button pressed. Attempting login...');
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
-      // Simular retraso de red
-      Future.delayed(const Duration(seconds: 1), () {
+      try {
+        final success = await _loginController.login(
+          _usernameController.text,
+          _passwordController.text,
+        );
+
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
 
-          if (_usernameController.text == 'admin' &&
-              _passwordController.text == 'admin') {
-            // Navegar al Home si las credenciales son correctas
+          if (success) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => const MyHomePage(title: 'Fisca GIS'),
@@ -46,7 +51,19 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }
         }
-      });
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 

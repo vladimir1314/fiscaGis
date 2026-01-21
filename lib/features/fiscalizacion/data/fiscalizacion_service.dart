@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:fiscagis/core/services/http_provider.dart';
 import 'package:fiscagis/features/fiscalizacion/data/fiscalizacion_models.dart';
 import 'package:fiscagis/features/fiscalizacion/data/local_database.dart';
 import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
 
 class FiscalizacionService extends ChangeNotifier {
@@ -13,6 +16,7 @@ class FiscalizacionService extends ChangeNotifier {
   }
 
   final _db = LocalDatabase.instance;
+  final _httpProvider = HttpProvider();
 
   // Cache State (for UI binding)
   PredioModel predio = PredioModel();
@@ -44,8 +48,8 @@ class FiscalizacionService extends ChangeNotifier {
     construcciones = [];
     foto = FotoModel(idPredio: newId);
     
-    // Save initial draft
-    await _db.insertOrUpdatePredio(predio);
+    // Save initial draft - REMOVED to prevent empty records
+    // await _db.insertOrUpdatePredio(predio);
     notifyListeners();
   }
 
@@ -71,6 +75,13 @@ class FiscalizacionService extends ChangeNotifier {
   Future<void> addConstruccion(ConstruccionModel construccion) async {
     // Ensure FK is set
     construccion.idPredio = predio.idPredio ?? '';
+
+    // Ensure predio exists in DB before adding child
+    await _db.insertOrUpdatePredio(predio);
+
+    // Prevent duplicates
+    if (construcciones.any((c) => c.id == construccion.id)) return;
+
     construcciones.add(construccion);
     await _db.insertConstruccion(construccion);
     notifyListeners();
@@ -86,7 +97,17 @@ class FiscalizacionService extends ChangeNotifier {
     if (newFoto.idCaptura == null) {
         newFoto.idCaptura = DateTime.now().millisecondsSinceEpoch.toString();
     }
+    
+    // Ensure ID consistency with parent (uses newId if synced)
+    if (predio.idPredio != null) {
+      newFoto.idPredio = predio.idPredio;
+    }
+
     foto = newFoto;
+    
+    // Ensure predio exists in DB before adding child
+    await _db.insertOrUpdatePredio(predio);
+    
     await _db.insertOrUpdateFoto(foto);
     notifyListeners();
   }
@@ -111,55 +132,170 @@ class FiscalizacionService extends ChangeNotifier {
          return SyncResult(success: true, message: "Todo está actualizado.", count: 0);
        }
        
+       // Map to track ID changes: OldID -> NewID
+       Map<String, String> idMap = {};
+
        // 2. Real API Sending loop
-       final url = Uri.parse('https://jsonplaceholder.typicode.com/posts'); 
        int successCount = 0;
        
        // Send Predios
        for (var item in unsyncedPredios) {
          try {
-            final resp = await http.post(
-              url,
-              headers: {"Content-Type": "application/json"},
-              body: jsonEncode(item),
+            // Convert Map<String, dynamic> to Map<String, String> for fields
+           final Map<String, String> fields = {};
+
+            item.forEach((key, value) {
+              if (key == 'c_firma') return; // NO enviar como campo
+              if (value != null) {
+                fields[key] = value.toString();
+              }
+            });
+            
+           List<http.MultipartFile> files = [];
+
+              final firmaPath = item['c_firma'];
+              if (firmaPath != null && firmaPath.isNotEmpty) {
+                final file = File(firmaPath);
+                if (await file.exists()) {
+                  files.add(
+                    await http.MultipartFile.fromPath(
+                      'firma_predio',
+                      file.path,
+                    ),
+                  );
+                }
+              }
+
+
+            final resp = await _httpProvider.postMultipart(
+              'fiscalizacionGis/predio/registrar',
+              fields: fields,
+              files: files,
             );
-            if (resp.statusCode == 200 || resp.statusCode == 201) {
-              await _db.markSynced('predio', 'id_predio', item['id_predio']);
+            
+            if (resp != null) {
+              final oldId = item['id_predio'].toString();
+              String? newId;
+
+              // Try to parse new ID from response
+              if (resp is Map) {
+                if (resp.containsKey('id_predio')) newId = resp['id_predio']?.toString();
+                else if (resp.containsKey('id')) newId = resp['id']?.toString();
+                // Check data wrapper
+                if (newId == null && resp['data'] is Map) {
+                   newId = resp['data']['id_predio']?.toString() ?? resp['data']['id']?.toString();
+                }
+              }
+
+              // Update local DB if ID changed
+              if (newId != null && newId.isNotEmpty && newId != oldId) {
+                await _db.updatePredioId(oldId, newId);
+                idMap[oldId] = newId;
+                
+                // Update current in-memory model if it matches
+                if (predio.idPredio == oldId) {
+                   predio.idPredio = newId;
+                   // Update children in memory to maintain consistency
+                   for (var c in construcciones) {
+                      if (c.idPredio == oldId) c.idPredio = newId;
+                   }
+                   if (foto.idPredio == oldId) {
+                      foto.idPredio = newId; // Explicitly use newId for foto
+                   }
+                }
+              }
+
+              await _db.markSynced('predio', 'id_predio', newId ?? oldId);
               successCount++;
             }
-         } catch(e) { print(e); }
+         } catch(e) { debugPrint('Error syncing predio: $e'); }
        }
        
         // Send Construcciones
        for (var item in unsyncedConst) {
          try {
-           final resp = await http.post(
-             url,
-             headers: {"Content-Type": "application/json"},
-             body: jsonEncode(item),
+           final oldPredioId = item['id_predio'].toString();
+           final targetPredioId = idMap[oldPredioId] ?? oldPredioId;
+
+           // Format fields according to requirement
+           String fecha = '';
+           if (item['fecha_construccion'] != null) {
+              try {
+                final date = DateTime.parse(item['fecha_construccion'].toString());
+                fecha = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+              } catch (_) {
+                fecha = item['fecha_construccion'].toString();
+              }
+           }
+
+           final Map<String, String> fields = {
+             "id_predio": targetPredioId,
+             "piso": item['piso']?.toString() ?? '',
+             "seccion": item['seccion']?.toString() ?? '',
+             "fecha_construccion": fecha,
+             "clasificacion": item['clasificacion']?.toString() ?? '',
+             "material": item['material']?.toString() ?? '',
+             "estado": item['estado']?.toString() ?? '',
+             "mc": item['mc']?.toString() ?? '',
+             "t": item['t']?.toString() ?? '',
+             "p": item['p']?.toString() ?? '',
+             "pv": item['pv']?.toString() ?? '',
+             "r": item['r']?.toString() ?? '',
+             "b": item['b']?.toString() ?? '',
+             "ie": item['ie']?.toString() ?? '',
+             "area_construccion": item['area_construccion']?.toString() ?? '',
+             "area_inspeccionada": item['area_inspeccionada']?.toString() ?? '',
+           };
+           
+           final resp = await _httpProvider.post(
+             'fiscalizacionGis/construccion/registrar',
+             body: fields,
            );
-           if (resp.statusCode == 200 || resp.statusCode == 201) {
+           
+           if (resp != null) {
              await _db.markSynced('construccion', 'id', item['id']);
              successCount++;
            }
-         } catch(e) { print(e); }
+         } catch(e) { debugPrint('Error syncing construccion: $e'); }
        }
        
         // Send Fotos
        for (var item in unsyncedFotos) {
          try {
-           final resp = await http.post(
-             url,
-             headers: {"Content-Type": "application/json"},
-             body: jsonEncode(item),
+           final oldPredioId = item['id_predio'].toString();
+           final targetPredioId = idMap[oldPredioId] ?? oldPredioId;
+
+           final Map<String, String> fields = {
+             'id_predio': targetPredioId,
+             'descripcion': item['descripcion']?.toString() ?? '',
+           };
+
+           List<http.MultipartFile> files = [];
+
+           // Process image if path exists
+           if (item['c_ruta'] != null && item['c_ruta'].isNotEmpty) {
+             final file = File(item['c_ruta']);
+             if (await file.exists()) {
+               files.add(await http.MultipartFile.fromPath('foto_captura', file.path));
+             }
+           }
+
+           final resp = await _httpProvider.postMultipart(
+             'fiscalizacionGis/captura/registrar',
+             fields: fields,
+             files: files,
            );
-           if (resp.statusCode == 200 || resp.statusCode == 201) {
+
+           if (resp != null) {
              await _db.markSynced('foto', 'id_captura', item['id_captura']);
              successCount++;
            }
-         } catch(e) { print(e); }
+         } catch(e) { debugPrint('Error syncing foto: $e'); }
        }
        
+       // Clean up synced data
+       await _db.deleteAllSynced();
+
        isSyncing = false;
        await loadAll(); // Refresh list to update sync icons
        notifyListeners();

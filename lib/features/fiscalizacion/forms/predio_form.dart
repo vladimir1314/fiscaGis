@@ -29,6 +29,8 @@ class _PredioFormState extends State<PredioForm> {
   String? _selectedUso;
   String? _selectedClasi;
 
+  String? _loadedId;
+
   @override
   void initState() {
     super.initState();
@@ -52,20 +54,27 @@ class _PredioFormState extends State<PredioForm> {
 
   void _loadData() {
     final predio = _service.predio;
-    _idPredioInfoCtrl.text = predio.idPredio ?? '';
-    _idPropInfoCtrl.text = predio.idPropietario ?? '';
-    _nombrePropCtrl.text = predio.nombrePropietario ?? '';
-    _direccionCtrl.text = predio.direccion ?? '';
-    _numeroCtrl.text = predio.numero ?? '';
-    if (_barrioCtrl.text != predio.barrio) _barrioCtrl.text = predio.barrio ?? '';
-    if (_manzanaCtrl.text != predio.manzana) _manzanaCtrl.text = predio.manzana ?? '';
-    if (_loteCtrl.text != predio.lote) _loteCtrl.text = predio.lote ?? '';
     
-    _selectedCondicion = predio.condicion;
-    _selectedEstado = predio.estado;
-    _selectedTipo = predio.tipo;
-    _selectedUso = predio.uso;
-    _selectedClasi = predio.clasificacion;
+    // Only reload text controllers if we are looking at a different predio
+    // This prevents overwriting user input when other parts of the app (like Map) update the model
+    if (_loadedId != predio.idPredio) {
+      _loadedId = predio.idPredio;
+      
+      _idPredioInfoCtrl.text = predio.idPredio ?? '';
+      _idPropInfoCtrl.text = predio.idPropietario ?? '';
+      _nombrePropCtrl.text = predio.nombrePropietario ?? '';
+      _direccionCtrl.text = predio.direccion ?? '';
+      _numeroCtrl.text = predio.numero ?? '';
+      _barrioCtrl.text = predio.barrio ?? '';
+      _manzanaCtrl.text = predio.manzana ?? '';
+      _loteCtrl.text = predio.lote ?? '';
+      
+      _selectedCondicion = predio.condicion;
+      _selectedEstado = predio.estado;
+      _selectedTipo = predio.tipo;
+      _selectedUso = predio.uso;
+      _selectedClasi = predio.clasificacion;
+    }
 
     if (mounted) setState(() {});
   }
@@ -183,14 +192,11 @@ class _PredioFormState extends State<PredioForm> {
     // Helper to safely update model
     final current = _service.predio;
     _service.updatePredio(PredioModel(
-      idPredio: current.idPredio,
-      idPropietario: current.idPropietario,
-      nombrePropietario: current.nombrePropietario,
-      direccion: current.direccion,
-      numero: current.numero, // No changes allowed for read-only? Assuming Numero is readonly for now as per code structure, or should it be editable?
-      // Wait, _numeroCtrl was created but used in _buildReadOnlyField in my code above? No, I put it as ReadOnlyField in the build method.
-      // Ideally 'Direccion' and 'Numero' are likely Master Data so ReadOnly, or maybe editable?
-      // I will keep them ReadOnly for now since they seem to come from a pre-filled database
+      idPredio: _idPredioInfoCtrl.text,
+      idPropietario: _idPropInfoCtrl.text,
+      nombrePropietario: _nombrePropCtrl.text,
+      direccion: _direccionCtrl.text,
+      numero: _numeroCtrl.text,
       barrio: _barrioCtrl.text,
       manzana: _manzanaCtrl.text,
       lote: _loteCtrl.text,

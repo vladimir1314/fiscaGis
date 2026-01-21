@@ -59,6 +59,7 @@ class LocalDatabase {
         piso TEXT,
         seccion TEXT,
         fecha_construccion TEXT,
+        clasificacion TEXT,
         material TEXT,
         estado TEXT,
         area_construccion REAL,
@@ -177,6 +178,7 @@ class LocalDatabase {
       'piso': item.piso,
       'seccion': item.seccion,
       'fecha_construccion': item.fechaConstruccion.toIso8601String(),
+      'clasificacion': item.clasificacion,
       'material': item.material,
       'estado': item.estado,
       'area_construccion': item.areaConstruccion,
@@ -197,6 +199,7 @@ class LocalDatabase {
       piso: json['piso'] as String,
       seccion: json['seccion'] as String,
       fechaConstruccion: DateTime.parse(json['fecha_construccion'] as String),
+      clasificacion: json['clasificacion'] as String?,
       material: json['material'] as String,
       estado: json['estado'] as String,
       areaConstruccion: json['area_construccion'] as double,
@@ -248,5 +251,30 @@ class LocalDatabase {
   Future<void> markSynced(String table, String idCol, String id) async {
     final db = await database;
     await db.update(table, {'is_synced': 1}, where: '$idCol = ?', whereArgs: [id]);
+  }
+
+  Future<void> updatePredioId(String oldId, String newId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.update('predio', {'id_predio': newId}, where: 'id_predio = ?', whereArgs: [oldId]);
+      await txn.update('construccion', {'id_predio': newId}, where: 'id_predio = ?', whereArgs: [oldId]);
+      await txn.update('foto', {'id_predio': newId}, where: 'id_predio = ?', whereArgs: [oldId]);
+    });
+  }
+
+  Future<void> deleteAllSynced() async {
+    final db = await database;
+    // Delete synced children first
+    await db.delete('construccion', where: 'is_synced = 1');
+    await db.delete('foto', where: 'is_synced = 1');
+    
+    // Delete synced predios ONLY if they have no remaining children (orphaned or unsynced)
+    // This protects predios that still have unsynced children from being deleted.
+    await db.rawDelete('''
+      DELETE FROM predio 
+      WHERE is_synced = 1 
+      AND id_predio NOT IN (SELECT id_predio FROM construccion)
+      AND id_predio NOT IN (SELECT id_predio FROM foto)
+    ''');
   }
 }

@@ -5,6 +5,8 @@ import 'package:fiscagis/features/fiscalizacion/data/fiscalizacion_service.dart'
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:sqflite/sqflite.dart';
 
 class FotoForm extends StatefulWidget {
   const FotoForm({super.key});
@@ -18,14 +20,47 @@ class _FotoFormState extends State<FotoForm> {
   final _descController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
 
+  @override
+  void initState() {
+    super.initState();
+    _updateFromService();
+    _service.addListener(_updateFromService);
+  }
+
+  @override
+  void dispose() {
+    _service.removeListener(_updateFromService);
+    _descController.dispose();
+    super.dispose();
+  }
+
+  void _updateFromService() {
+    if (!mounted) return;
+    setState(() {
+      // Only update text if it's different to avoid cursor jumps or overwriting user typing
+      if (_service.foto.descripcion != _descController.text) {
+        _descController.text = _service.foto.descripcion ?? '';
+      }
+    });
+  }
+
   Future<void> _takePhoto() async {
     try {
       final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
       if (photo != null) {
+         // Save to persistent storage
+         final dbPath = await getDatabasesPath();
+         final fileName = 'foto_${DateTime.now().millisecondsSinceEpoch}.jpg';
+         final persistentPath = p.join(dbPath, fileName);
+         await File(photo.path).copy(persistentPath);
+
+         // Use current predio ID from service to ensure consistency with DB (handles synced newId)
+         final currentPredioId = _service.predio.idPredio;
+
          _service.updateFoto(FotoModel(
             idCaptura: _service.foto.idCaptura,
-            idPredio: _service.foto.idPredio,
-            cRuta: photo.path,
+            idPredio: currentPredioId,
+            cRuta: persistentPath,
             descripcion: _descController.text,
           ));
           setState(() {});

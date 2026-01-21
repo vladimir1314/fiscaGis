@@ -54,10 +54,26 @@ class _MapaFormState extends State<MapaForm> {
         throw 'Permisos de ubicación denegados permanentemente.';
       }
 
-      Position position = await Geolocator.getCurrentPosition();
+      // Try to get last known position first for speed
+      try {
+        final lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null) {
+          setState(() {
+            _currentCenter = LatLng(lastKnown.latitude, lastKnown.longitude);
+            _mapController.move(_currentCenter, 16.0);
+          });
+        }
+      } catch (_) {}
+
+      // Get precise position with timeout
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      
       setState(() {
         _currentCenter = LatLng(position.latitude, position.longitude);
-        _mapController.move(_currentCenter, 16.0);
+        _mapController.move(_currentCenter, 18.0);
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ubicación actualizada')));
 

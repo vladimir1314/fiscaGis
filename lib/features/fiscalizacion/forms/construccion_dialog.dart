@@ -3,7 +3,8 @@ import 'package:fiscagis/features/fiscalizacion/data/fiscalizacion_models.dart';
 import 'package:flutter/material.dart';
 
 class ConstruccionDialog extends StatefulWidget {
-  const ConstruccionDialog({super.key});
+  final String idPredio;
+  const ConstruccionDialog({super.key, required this.idPredio});
 
   @override
   State<ConstruccionDialog> createState() => _ConstruccionDialogState();
@@ -12,6 +13,7 @@ class ConstruccionDialog extends StatefulWidget {
 class _ConstruccionDialogState extends State<ConstruccionDialog> {
   final _pisoCtrl = TextEditingController();
   final _seccionCtrl = TextEditingController();
+  final _clasificacionCtrl = TextEditingController();
   final _materialCtrl = TextEditingController();
   final _areaCtrl = TextEditingController();
   
@@ -27,21 +29,25 @@ class _ConstruccionDialogState extends State<ConstruccionDialog> {
   final List<String> _catOptions = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
   
   String _estado = 'BUENO';
+  bool _isSaving = false;
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Nueva Construcción'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Row(children: [
                 Expanded(child: TextField(controller: _pisoCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Piso'))),
                 const SizedBox(width: 8),
                 Expanded(child: TextField(controller: _seccionCtrl, decoration: const InputDecoration(labelText: 'Sección'))),
             ]),
+            TextField(controller: _clasificacionCtrl, decoration: const InputDecoration(labelText: 'Clasificación')),
             TextField(controller: _materialCtrl, decoration: const InputDecoration(labelText: 'Material')),
             TextField(controller: _areaCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Área (m2)')),
             DropdownButtonFormField<String>(
@@ -65,21 +71,27 @@ class _ConstruccionDialogState extends State<ConstruccionDialog> {
                 _buildCatDropdown('B', _b, (v) => _b = v),
                 _buildCatDropdown('IE', _ie, (v) => _ie = v),
               ],
-            ),
-          ],
+            )
+            ],
+
+          
+          ),
         ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
         ElevatedButton(
-          onPressed: () {
+          onPressed: _isSaving ? null : () {
             if (_pisoCtrl.text.isEmpty) return;
+            setState(() => _isSaving = true);
+            
             final newC = ConstruccionModel(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
-              idPredio: '11628', 
+              idPredio: widget.idPredio, 
               piso: _pisoCtrl.text,
               seccion: _seccionCtrl.text,
               fechaConstruccion: DateTime.now(),
+              clasificacion: _clasificacionCtrl.text,
               material: _materialCtrl.text,
               estado: _estado,
               mc: _mc, t: _t, p: _p,

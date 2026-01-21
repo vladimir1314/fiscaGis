@@ -13,7 +13,7 @@ class LoginRequest {
     return {
       'usuario': usuario,
       'clave': clave,
-      'idSistema': idSistema,
+      'id_sistema': int.tryParse(idSistema) ?? 0,
     };
   }
 }

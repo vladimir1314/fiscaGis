@@ -13,6 +13,7 @@ class ConstruccionForm extends StatefulWidget {
 
 class _ConstruccionFormState extends State<ConstruccionForm> {
   final _service = FiscalizacionService();
+  bool _isOpening = false;
 
   @override
   void initState() {
@@ -31,13 +32,26 @@ class _ConstruccionFormState extends State<ConstruccionForm> {
   }
 
   Future<void> _addConstruccion() async {
-    final result = await showDialog<ConstruccionModel>(
-      context: context,
-      builder: (context) => const ConstruccionDialog(),
-    );
+    if (_isOpening) return;
+    _isOpening = true;
 
-    if (result != null) {
-      _service.addConstruccion(result);
+    try {
+      final result = await showDialog<ConstruccionModel>(
+        context: context,
+        builder: (context) => ConstruccionDialog(
+          idPredio: _service.predio.idPredio ?? '',
+        ),
+      );
+
+      if (result != null) {
+        _service.addConstruccion(result);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al abrir formulario: $e')),
+      );
+    } finally {
+      _isOpening = false;
     }
   }
 

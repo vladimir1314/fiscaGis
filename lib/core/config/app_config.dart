@@ -1,6 +1,6 @@
 class AppConfig {
   // Servidor
-  static const String baseUrl = 'http://84.247.176.139:5004';
+  static const String baseUrl = 'https://glgisclienteb.ideasg.org';
 
   // Identificadores
   static const String idSistema = '43';

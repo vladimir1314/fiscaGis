@@ -136,6 +136,7 @@ class FiscalizacionService extends ChangeNotifier {
        Map<String, String> idMap = {};
 
        // 2. Real API Sending loop
+
        int successCount = 0;
        
        // Send Predios
@@ -310,9 +311,126 @@ class FiscalizacionService extends ChangeNotifier {
        isSyncing = false;
        notifyListeners();
        return SyncResult(success: false, message: "Error de conexión: $e");
-     }
+           }
   }
-}
+
+  // --- DOWNLOAD DATA (Server -> Mobile) ---
+  Future<SyncResult> downloadData() async {
+    try {
+      isSyncing = true;
+      notifyListeners();
+
+      // Example endpoint: 'movil/fiscalizacion/download'
+      // Expecting a JSON with lists of predios, construcciones, etc. assigned to this user/device
+      final response = await _httpProvider.get('movil/fiscalizacion/download');
+      
+      if (response != null && response is Map<String, dynamic>) {
+         int count = 0;
+         
+         // 1. Predios
+         if (response['predios'] != null) {
+           for (var p in response['predios']) {
+             await _db.insertOrUpdatePredio(PredioModel(
+               idPredio: p['idPredio'],
+               // ... map other fields ...
+               nombrePropietario: p['nombrePropietario'],
+               direccion: p['direccion'],
+               // simple mapping for demo
+               isSynced: true,
+             ));
+             count++;
+           }
+         }
+         
+         // 2. Otras Instalaciones
+         if (response['otrasInstalaciones'] != null) {
+           for (var item in response['otrasInstalaciones']) {
+              await _db.insertOtrasInstalaciones(OtrasInstalacionesModel(
+                id: item['id'],
+                idPredio: item['idPredio'],
+                tipo: item['tipo'],
+                unidadMedida: item['unidadMedida'],
+                cantidad: (item['cantidad'] as num).toDouble(),
+                estadoConservacion: item['estadoConservacion'],
+              ));
+              count++;
+           }
+         }
+
+          // 3. Declaraciones
+         if (response['declaraciones'] != null) {
+           for (var item in response['declaraciones']) {
+              await _db.insertDeclaracion(DeclaracionModel(
+                id: item['id'],
+                idPredio: item['idPredio'],
+                fechaDeclaracion: DateTime.parse(item['fechaDeclaracion']),
+                numeroDeclaracion: item['numeroDeclaracion'],
+                areaTerrenoDeclarada: (item['areaTerrenoDeclarada'] as num).toDouble(),
+                areaConstruidaDeclarada: (item['areaConstruidaDeclarada'] as num).toDouble(),
+              ));
+              count++;
+           }
+         }
+
+         // 4. Diferencias Areas
+         if (response['diferencias'] != null) {
+           for (var item in response['diferencias']) {
+              await _db.insertDiferenciaArea(DiferenciaAreaModel(
+                id: item['id'],
+                idPredio: item['idPredio'],
+                tipoArea: item['tipoArea'],
+                areaDeclarada: (item['areaDeclarada'] as num).toDouble(),
+                areaVerificada: (item['areaVerificada'] as num).toDouble(),
+                diferencia: (item['diferencia'] as num).toDouble(),
+              ));
+              count++;
+           }
+         }
+         
+         isSyncing = false;
+         notifyListeners();
+         return SyncResult(success: true, message: "Descarga completada.", count: count);
+      }
+      
+      isSyncing = false;
+      notifyListeners();
+      return SyncResult(success: false, message: "No se recibieron datos válidos.");
+
+    } catch (e) {
+      isSyncing = false;
+      notifyListeners();
+      return SyncResult(success: false, message: "Error de descarga: $e");
+    }
+  }
+
+  // --- SEARCH PREDIO ---
+  Future<List<PredioModel>> searchPredio(Map<String, String> filters) async {
+    try {
+      // filters: { 'codigo': '...', 'nombre': '...', 'manzana': '...' }
+      final response = await _httpProvider.post('movil/fiscalizacion/search', body: filters);
+      
+      List<PredioModel> results = [];
+      if (response != null && response is List) {
+        for (var p in response) {
+          results.add(PredioModel(
+             idPredio: p['idPredio'],
+             nombrePropietario: p['nombrePropietario'],
+             direccion: p['direccion'],
+             numero: p['numero'],
+             manzana: p['manzana'],
+             lote: p['lote'],
+             // map essentials for selection
+          ));
+        }
+      }
+      return results;
+    } catch (e) {
+      debugPrint("Search error: $e");
+      return [];
+    }
+  }
+  }
+
 
 class SyncResult {
   final bool success;

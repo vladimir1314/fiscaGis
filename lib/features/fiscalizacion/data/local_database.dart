@@ -81,6 +81,51 @@ class LocalDatabase {
         FOREIGN KEY (id_predio) REFERENCES predio (id_predio)
       )
     ''');
+    // Table OTRAS_INSTALACIONES
+    await db.execute('''
+      CREATE TABLE otras_instalaciones (
+        id TEXT PRIMARY KEY,
+        id_predio TEXT,
+        tipo TEXT,
+        unidad_medida TEXT,
+        cantidad REAL,
+        estado_conservacion TEXT,
+        created_at TEXT,
+        is_synced INTEGER DEFAULT 0,
+        FOREIGN KEY (id_predio) REFERENCES predio (id_predio)
+      )
+    ''');
+
+    // Table DECLARACIONES
+    await db.execute('''
+      CREATE TABLE declaraciones (
+        id TEXT PRIMARY KEY,
+        id_predio TEXT,
+        fecha_declaracion TEXT,
+        numero_declaracion TEXT,
+        area_terreno_declarada REAL,
+        area_construida_declarada REAL,
+        created_at TEXT,
+        is_synced INTEGER DEFAULT 0,
+        FOREIGN KEY (id_predio) REFERENCES predio (id_predio)
+      )
+    ''');
+
+
+    // Table DIFERENCIAS_AREAS
+    await db.execute('''
+      CREATE TABLE diferencias_areas (
+        id TEXT PRIMARY KEY,
+        id_predio TEXT,
+        tipo_area TEXT,
+        area_declarada REAL,
+        area_verificada REAL,
+        diferencia REAL,
+        created_at TEXT,
+        is_synced INTEGER DEFAULT 0,
+        FOREIGN KEY (id_predio) REFERENCES predio (id_predio)
+      )
+    ''');
   }
 
   // --- CRUD PREDIO ---
@@ -276,5 +321,48 @@ class LocalDatabase {
       AND id_predio NOT IN (SELECT id_predio FROM construccion)
       AND id_predio NOT IN (SELECT id_predio FROM foto)
     ''');
+  }
+
+
+  // --- CRUD OTRAS INSTALACIONES ---
+  Future<void> insertOtrasInstalaciones(OtrasInstalacionesModel item) async {
+    final db = await database;
+    await db.insert('otras_instalaciones', {
+      'id': item.id,
+      'id_predio': item.idPredio,
+      'tipo': item.tipo,
+      'unidad_medida': item.unidadMedida,
+      'cantidad': item.cantidad,
+      'estado_conservacion': item.estadoConservacion,
+      'is_synced': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  // --- CRUD DECLARACIONES ---
+  Future<void> insertDeclaracion(DeclaracionModel item) async {
+    final db = await database;
+    await db.insert('declaraciones', {
+      'id': item.id,
+      'id_predio': item.idPredio,
+      'fecha_declaracion': item.fechaDeclaracion.toIso8601String(),
+      'numero_declaracion': item.numeroDeclaracion,
+      'area_terreno_declarada': item.areaTerrenoDeclarada,
+      'area_construida_declarada': item.areaConstruidaDeclarada,
+      'is_synced': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  // --- CRUD DIFERENCIAS AREAS ---
+  Future<void> insertDiferenciaArea(DiferenciaAreaModel item) async {
+    final db = await database;
+    await db.insert('diferencias_areas', {
+      'id': item.id,
+      'id_predio': item.idPredio,
+      'tipo_area': item.tipoArea,
+      'area_declarada': item.areaDeclarada,
+      'area_verificada': item.areaVerificada,
+      'diferencia': item.diferencia,
+      'is_synced': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }

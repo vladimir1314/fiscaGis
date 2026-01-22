@@ -1,6 +1,10 @@
 import 'package:fiscagis/core/theme/app_colors.dart';
 import 'package:fiscagis/features/fiscalizacion/fiscalizacion_screen.dart';
 import 'package:fiscagis/features/fiscalizacion/fiscalizaciones_list_screen.dart'; // Fixed import
+// New Imports
+import 'package:fiscagis/features/sync/sync_screen.dart';
+import 'package:fiscagis/features/search/search_predio_screen.dart';
+import 'package:fiscagis/features/map/map_screen.dart';
 import 'package:flutter/material.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -102,7 +106,25 @@ class DashboardScreen extends StatelessWidget {
                     icon: Icons.map,
                     title: 'Mapa General',
                     color: Colors.green,
-                    onTap: () {}, // TBD
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen()));
+                    },
+                  ),
+                   _DashboardCard(
+                    icon: Icons.search,
+                    title: 'Buscar Predio',
+                    color: Colors.teal,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPredioScreen()));
+                    },
+                  ),
+                   _DashboardCard(
+                    icon: Icons.sync,
+                    title: 'Sincronizar Data',
+                    color: Colors.indigo,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SyncScreen()));
+                    },
                   ),
                 ],
               ),

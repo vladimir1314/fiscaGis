@@ -93,3 +93,63 @@ class FotoModel {
     this.createdAt,
   });
 }
+
+class OtrasInstalacionesModel {
+  String id;
+  String idPredio;
+  String tipo; // e.g. "Piscina", "Muro"
+  String unidadMedida; // "m2", "ml", "und"
+  double cantidad;
+  String estadoConservacion; // "Bueno", "Regular", "Malo"
+  DateTime? createdAt;
+
+  OtrasInstalacionesModel({
+    required this.id,
+    required this.idPredio,
+    required this.tipo,
+    required this.unidadMedida,
+    required this.cantidad,
+    required this.estadoConservacion,
+    this.createdAt,
+  });
+}
+
+class DeclaracionModel {
+  String id;
+  String idPredio;
+  DateTime fechaDeclaracion;
+  String numeroDeclaracion;
+  double areaTerrenoDeclarada;
+  double areaConstruidaDeclarada;
+  DateTime? createdAt;
+
+  DeclaracionModel({
+    required this.id,
+    required this.idPredio,
+    required this.fechaDeclaracion,
+    required this.numeroDeclaracion,
+    required this.areaTerrenoDeclarada,
+    required this.areaConstruidaDeclarada,
+    this.createdAt,
+  });
+}
+
+class DiferenciaAreaModel {
+  String id;
+  String idPredio;
+  String tipoArea; // "Terreno", "Construcción"
+  double areaDeclarada;
+  double areaVerificada; // Por drone/campo
+  double diferencia;
+  DateTime? createdAt;
+
+  DiferenciaAreaModel({
+    required this.id,
+    required this.idPredio,
+    required this.tipoArea,
+    required this.areaDeclarada,
+    required this.areaVerificada,
+    required this.diferencia,
+    this.createdAt,
+  });
+}

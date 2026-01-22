@@ -8,13 +8,20 @@ class LoggingTileProvider extends NetworkTileProvider {
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
     String url = "";
     if (options.wmsOptions != null) {
-      url = options.wmsOptions!.getUrl(coordinates, (options.tileSize ?? 256).toInt(), false);
+      url = options.wmsOptions!.getUrl(
+        coordinates,
+        (options.tileSize ?? 256).toInt(),
+        false,
+      );
     } else {
-      url = options.urlTemplate?.replaceAll('{x}', coordinates.x.toString())
-          .replaceAll('{y}', coordinates.y.toString())
-          .replaceAll('{z}', coordinates.z.toString()) ?? "";
+      url =
+          options.urlTemplate
+              ?.replaceAll('{x}', coordinates.x.toString())
+              .replaceAll('{y}', coordinates.y.toString())
+              .replaceAll('{z}', coordinates.z.toString()) ??
+          "";
     }
-    
+
     LogService().log('Tile URL: $url');
     return super.getImage(coordinates, options);
   }
@@ -29,7 +36,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   late final MapController _mapController;
-  
+
   // Layer visibility state
   bool _showSector = true;
   bool _showManzana = true;
@@ -67,7 +74,10 @@ class _MapScreenState extends State<MapScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text("Capas del Mapa", style: Theme.of(context).textTheme.titleLarge),
+                      Text(
+                        "Capas del Mapa",
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
                       const Divider(),
                       SwitchListTile(
                         title: const Text("Sectores"),
@@ -127,18 +137,20 @@ class _MapScreenState extends State<MapScreen> {
     if (_showSector) activeLayers.add('bd_lamolina2026:sp_sector');
     if (_showManzana) activeLayers.add('bd_lamolina2026:sp_manzana');
     if (_showLote) activeLayers.add('bd_lamolina2026:sp_lote');
-    if (_showConstrucciones) activeLayers.add('bd_lamolina2026:sp_construcciones');
+    if (_showConstrucciones)
+      activeLayers.add('bd_lamolina2026:sp_construcciones');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mapa General'),
-      ),
+      appBar: AppBar(title: const Text('Mapa General')),
       body: Stack(
         children: [
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: const LatLng(-12.100, -76.942), // Refined for data coverage
+              initialCenter: const LatLng(
+                -12.100,
+                -76.942,
+              ), // Refined for data coverage
               initialZoom: 15.0,
             ),
             children: [
@@ -147,13 +159,14 @@ class _MapScreenState extends State<MapScreen> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.idg.fiscagis',
               ),
-              
+
               // User WMS Layer (Consolidated)
               if (activeLayers.isNotEmpty)
                 TileLayer(
                   tileProvider: LoggingTileProvider(),
                   wmsOptions: WMSTileLayerOptions(
-                    baseUrl: 'https://geoserver140.ideasg.org/geoserver/bd_lamolina2026/wms',
+                    baseUrl:
+                        'https://geoserver140.ideasg.org/geoserver/bd_lamolina2026/wms?',
                     layers: activeLayers.map((l) => l.split(':').last).toList(),
                     version: '1.1.1',
                     transparent: true,
@@ -165,7 +178,8 @@ class _MapScreenState extends State<MapScreen> {
                     },
                   ),
                   additionalOptions: const {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'User-Agent':
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                   },
                 ),
 
@@ -179,7 +193,6 @@ class _MapScreenState extends State<MapScreen> {
               //     format: 'image/png',
               //   ),
               // ),
-
               RichAttributionWidget(
                 attributions: [
                   TextSourceAttribution(
@@ -190,7 +203,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ],
           ),
-          
+
           // Controls
           Positioned(
             bottom: 30,
@@ -208,7 +221,7 @@ class _MapScreenState extends State<MapScreen> {
                   child: const Icon(Icons.layers),
                 ),
                 const SizedBox(height: 10),
-                
+
                 // Log Viewer
                 FloatingActionButton(
                   heroTag: 'logs',
@@ -219,7 +232,7 @@ class _MapScreenState extends State<MapScreen> {
                   child: const Icon(Icons.bug_report),
                 ),
                 const SizedBox(height: 10),
-                
+
                 // My Location (Demo)
                 FloatingActionButton(
                   heroTag: 'my_location',
@@ -227,9 +240,9 @@ class _MapScreenState extends State<MapScreen> {
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black87,
                   onPressed: () {
-                     // TODO: Implement actual geolocation
-                     // For now, center on La Molina
-                     _mapController.move(const LatLng(-12.089, -76.920), 16);
+                    // TODO: Implement actual geolocation
+                    // For now, center on La Molina
+                    _mapController.move(const LatLng(-12.089, -76.920), 16);
                   },
                   child: const Icon(Icons.my_location),
                 ),
